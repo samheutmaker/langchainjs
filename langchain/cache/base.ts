@@ -15,7 +15,7 @@ export const getCacheKey = (prompt: string, llmKey: string, idx?: string): strin
   `${prompt}_${llmKey}${idx ? `_${idx}` : ""}}`;
 
 export abstract class BaseCache<T = Generation[]> {
-  abstract lookup(prompt: string, llmKey: string): T | undefined;
+  abstract lookup(prompt: string, llmKey: string): Promise<T | null>;
 
   abstract update(prompt: string, llmKey: string, value: T): void;
 }

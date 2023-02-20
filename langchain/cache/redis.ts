@@ -1,40 +1,35 @@
-import { Redis } from 'io-redis';
+import type { RedisClientType } from 'redis';
 import { Generation } from "../llms";
 import { BaseCache, getCacheKey } from "./base";
 
 /**
- * Will be generalized to support other array-like types
- * in the future. Not needed for now.
  * 
- * TODO: Generalize to support other array-like types.
+ * TODO: Generalize to support other types.
  */
 
 export class RedisCache extends BaseCache<Generation[]> {
-  private redis: Redis;
+  #redisClient: RedisClientType;
 
-  constructor(redis: Redis) {
+  constructor(redisClient: RedisClientType) {
     super();
-    if (!redis) {
-      throw new Error('Please pass in Redis object.');
-    }
-    this.redis = redis;
+    this.#redisClient = redisClient;
   }
 
-  public lookup(prompt: string, llmKey: string): T | null {
+  public async lookup(prompt: string, llmKey: string): Promise<Generation[] | null> {
     let idx = 0;
     let key = getCacheKey(prompt, llmKey, String(idx));
+    let value = await this.#redisClient.get(key);
     const generations: Generation[] = [];
-    
-    while (this.redis.get(key)) {
-      let result: string | null | Buffer = this.redis.get(key);
-      if (!result) {
+  
+    while (value) {
+      if (!value) {
         break;
-      } else if (result instanceof Buffer) {
-        result = result.toString();
-      }
-      generations.push({ text: result });
+      } 
+      
+      generations.push({ text: value });
       idx += 1;
       key = getCacheKey(prompt, llmKey, String(idx));
+      value = await this.#redisClient.get(key);
     }
 
     return generations.length > 0 ? generations : null;
@@ -43,7 +38,7 @@ export class RedisCache extends BaseCache<Generation[]> {
   public update(prompt: string, llmKey: string, value: Generation[]): void {
     for (let i = 0; i < value.length; i += 1) {
       const key = getCacheKey(prompt, llmKey, String(i));
-      this.redis.set(key, value[i].text);
+      this.#redisClient.set(key, value[i].text);
     }
   }
 }
